@@ -3,7 +3,10 @@ import { Module } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 
 import queueConfig from '../config/queue.config';
-import { VIDEO_PROCESSING_QUEUE } from '../videos/videos.constants';
+import {
+  VIDEO_PROCESSING_QUEUE,
+  VIDEO_PROCESSING_SWEEP_QUEUE,
+} from '../videos/videos.constants';
 import { VideoQueueService } from './video-queue.service';
 
 @Module({
@@ -18,7 +21,10 @@ import { VideoQueueService } from './video-queue.service';
         },
       }),
     }),
-    BullModule.registerQueue({ name: VIDEO_PROCESSING_QUEUE }),
+    BullModule.registerQueue(
+      { name: VIDEO_PROCESSING_QUEUE },
+      { name: VIDEO_PROCESSING_SWEEP_QUEUE },
+    ),
   ],
   providers: [VideoQueueService],
   exports: [BullModule, VideoQueueService],

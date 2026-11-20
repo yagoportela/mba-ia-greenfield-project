@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 9/11 completed
+**SIs:** 10/11 completed
 
 ### SI-03.1 — Dependências, namespaces de configuração e validação de env
 - **Status:** completed
@@ -85,9 +85,13 @@
   - Mesmo override de `storageConfig.KEY` do SI-03.7 no e2e (`publicEndpoint = S3_ENDPOINT`) para as URLs presignadas serem acessíveis de dentro do container.
 
 ### SI-03.10 — Varredura de reconciliação e limpeza de uploads abandonados
-- **Status:** pending
-- **Tests:** pending
-- **Observations:** pending
+- **Status:** completed
+- **Tests:** 7 passing
+- **Observations:**
+  - `reconcileStuckProcessing` usa `LessThan(now-30min)` em `updated_at` e reenfileira por `jobId = videoId` (dedupe do BullMQ); `abortAbandonedUploads` filtra `draft` + `upload_id` via `Not(IsNull())` + `created_at < now-24h`, aborta o multipart e remove a linha.
+  - `abortAbandonedUploads` tolera `NoSuchUpload` (idempotente se o processo cair entre o abort e o delete) e propaga outros erros.
+  - Agendamento feito por um provider interno `SweepScheduler` (`OnModuleInit`) no `worker.module.ts`, com `repeat: { every: 900000 }` e `jobId: 'video-processing-sweep'`; `QueueModule` registra as duas filas (`video-processing` e `video-processing-sweep`).
+  - Verificado em runtime: `getRepeatableJobs()` mostra `sweep` a cada 900000ms e o worker consumiu um job `sweep` manual (`completed`), logando "0 stuck processing re-enqueued, 0 abandoned uploads removed".
 
 ### SI-03.11 — Exportação do contrato OpenAPI
 - **Status:** pending
