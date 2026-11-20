@@ -1,0 +1,2 @@
+Leia `.claude/skills/research/SKILL.md`, `CLAUDE.md`, `docs/project-plan.md`, `docs/diagrams/software-arch.mermaid` e os arquivos existentes em `docs/decisions/`.
+Execute a etapa de research da Fase 03 — Upload e Processamento de Vídeos e gere `docs/decisions/technical-decisions-phase-03-videos.md` seguindo exatamente o formato dos documentos de decisão existentes. Não altere código ainda.

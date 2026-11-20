@@ -1,0 +1,2 @@
+Leia `.claude/skills/plan-build/SKILL.md`, `docs/phases/phase-03-videos/context.md`, `docs/phases/phase-03-videos/library-refs.md` e use `docs/phases/phase-02-auth/phase-02-auth.md` como espelho de estrutura.
+Confirme que `validation.md` está `clean` e gere `docs/phases/phase-03-videos/phase-03-videos.md` contendo os Step Implementations (`SI-03.1` em diante), Technical Specifications (Data Model, API Contracts, Authorization Matrix, Error Catalog, Events/Messages), Dependency Map e Deliverables.

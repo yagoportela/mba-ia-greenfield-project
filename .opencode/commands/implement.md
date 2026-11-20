@@ -1,0 +1,2 @@
+Leia `.claude/skills/implement/SKILL.md`, `.claude/rules/nestjs-testing.md`, `nestjs-project/CLAUDE.md` e `docs/phases/phase-03-videos/phase-03-videos.md`.
+Implemente estritamente o SI solicitado ($ARGUMENTS), rodando `podman compose -f nestjs-project/compose.yaml exec nestjs-api ...` para instalar pacotes, rodar migrations, validar `npx tsc --noEmit`, `npm run lint` e os testes relacionados, e atualize `docs/phases/phase-03-videos/progress.md`.

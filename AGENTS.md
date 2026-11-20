@@ -1,7 +1,8 @@
-# Instruções Obrigatórias para OpenCode / DeepSeek
+# Project Instructions (OpenCode)
 
-Antes de executar qualquer comando ou gerar arquivos:
-1. Leia e siga todas as regras de `CLAUDE.md` (raiz) e `nestjs-project/CLAUDE.md`.
-2. Todo comando `npm`, `npx`, `tsc` ou `jest` DEVE ser executado dentro do container usando `podman compose exec nestjs-api <comando>` (nunca no host Windows).
-3. Antes de editar testes, leia `.claude/rules/nestjs-testing.md`.
-4. Siga estritamente o workflow em pipeline lendo o `SKILL.md` correspondente em `.claude/skills/<skill>/SKILL.md` antes de produzir cada artefato.
+Before executing any task, read and follow all rules in `CLAUDE.md`, `nestjs-project/CLAUDE.md`, and `.claude/rules/`.
+
+## Environment Overrides (Podman)
+- Every `npm`, `npx`, `tsc`, and `jest` command MUST run inside the container via `podman compose exec nestjs-api <command>` (never on the host).
+- Always run test suites sequentially with `--runInBand`.
+- Follow the project pipeline skills in `.claude/skills/<skill>/SKILL.md` in order: `research` → `plan-context` → `plan-validate` → `plan-resolve` → `plan-build` → `implement`.
