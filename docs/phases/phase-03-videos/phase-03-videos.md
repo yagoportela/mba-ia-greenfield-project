@@ -161,7 +161,7 @@ Deliver Phase 03's video pipeline end to end: presigned multipart uploads of fil
 ### SI-03.6 — Endpoint de iniciação de upload e consulta do vídeo
 
 **Route:** POST /videos, GET /videos/{id}
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-create.plan.md`
 **Authorization:** Authenticated + Owner
 
 **Description:** Criar a iniciação do upload — validação do DTO, geração do `public_id` único, criação do draft com sessão multipart e as exceções de domínio da fase — além do endpoint de consulta do próprio vídeo.
@@ -197,7 +197,7 @@ Deliver Phase 03's video pipeline end to end: presigned multipart uploads of fil
 ### SI-03.7 — Assinatura de parts e conclusão do upload
 
 **Route:** POST /videos/{id}/upload-parts, POST /videos/{id}/upload-complete
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload.plan.md`
 **Authorization:** Authenticated + Owner
 
 **Description:** Implementar a assinatura das URLs de partes do multipart e a conclusão do upload com validação de estado, tamanho real e tipo, transicionando o vídeo para `processing` e enfileirando o processamento.
@@ -267,7 +267,7 @@ _O smoke real de `ffmpeg`/`ffprobe` executa no container `media-worker`, cuja im
 ### SI-03.9 — Entrega: playback em streaming e download
 
 **Route:** GET /videos/{publicId}/playback, GET /videos/{publicId}/download
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-delivery.plan.md`
 **Authorization:** Authenticated + Owner
 
 **Description:** Expor o playback via streaming e o download por URLs presignadas de GET, com verificação de dono e `status = ready`, sem tornar a API um proxy de mídia.
