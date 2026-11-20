@@ -48,3 +48,67 @@ export class TokenReuseDetectedException extends DomainException {
     );
   }
 }
+
+export class VideoNotFoundException extends DomainException {
+  constructor() {
+    super('VIDEO_NOT_FOUND', 404, 'Video not found');
+  }
+}
+
+export class VideoAccessDeniedException extends DomainException {
+  constructor() {
+    super(
+      'VIDEO_ACCESS_DENIED',
+      403,
+      'You do not have access to this video',
+    );
+  }
+}
+
+export class VideoNotReadyException extends DomainException {
+  constructor() {
+    super('VIDEO_NOT_READY', 409, 'Video is not ready');
+  }
+}
+
+export class UnsupportedMediaTypeException extends DomainException {
+  constructor() {
+    super('UNSUPPORTED_MEDIA_TYPE', 415, 'Unsupported media type');
+  }
+}
+
+export class FileTooLargeException extends DomainException {
+  constructor() {
+    super(
+      'FILE_TOO_LARGE',
+      413,
+      'File exceeds the maximum allowed size',
+    );
+  }
+}
+
+export class InvalidUploadStateException extends DomainException {
+  constructor() {
+    super(
+      'INVALID_UPLOAD_STATE',
+      409,
+      'Upload is not in a valid state for this operation',
+    );
+  }
+}
+
+export class UploadIncompleteException extends DomainException {
+  constructor() {
+    super(
+      'UPLOAD_INCOMPLETE',
+      400,
+      'Uploaded parts do not cover the complete file',
+    );
+  }
+}
+
+export class StorageException extends DomainException {
+  constructor() {
+    super('STORAGE_ERROR', 502, 'Object storage operation failed');
+  }
+}
