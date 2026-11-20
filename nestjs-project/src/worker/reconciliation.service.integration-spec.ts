@@ -134,19 +134,16 @@ describe('ReconciliationService (integration)', () => {
 
     expect(count).toBe(1);
     expect(videoQueueService.enqueueProcessing).toHaveBeenCalledTimes(1);
-    expect(videoQueueService.enqueueProcessing).toHaveBeenCalledWith(
-      stuck.id,
-    );
+    expect(videoQueueService.enqueueProcessing).toHaveBeenCalledWith(stuck.id);
     expect(recent.id).not.toBe(stuck.id);
   });
 
   it('should abort and remove abandoned drafts older than 24 hours', async () => {
     const abandoned = await createVideo(VideoStatus.Draft);
-    const { uploadId: abandonedUploadId } =
-      await storage.createMultipartUpload(
-        abandoned.storage_key,
-        'video/mp4',
-      );
+    const { uploadId: abandonedUploadId } = await storage.createMultipartUpload(
+      abandoned.storage_key,
+      'video/mp4',
+    );
     await videoRepository.update(abandoned.id, {
       upload_id: abandonedUploadId,
     });
@@ -156,8 +153,10 @@ describe('ReconciliationService (integration)', () => {
     );
 
     const recent = await createVideo(VideoStatus.Draft);
-    const { uploadId: recentUploadId } =
-      await storage.createMultipartUpload(recent.storage_key, 'video/mp4');
+    const { uploadId: recentUploadId } = await storage.createMultipartUpload(
+      recent.storage_key,
+      'video/mp4',
+    );
     await videoRepository.update(recent.id, {
       upload_id: recentUploadId,
     });

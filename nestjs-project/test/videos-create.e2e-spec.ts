@@ -11,9 +11,9 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
-import { AuthService } from '../src/auth/auth.service';
 import { DomainExceptionFilter } from '../src/common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
+import { MailService } from '../src/mail/mail.service';
 import { StorageService } from '../src/storage/storage.service';
 import { cleanAllTables } from '../src/test/create-test-data-source';
 import { Video, VideoStatus } from '../src/videos/entities/video.entity';
@@ -21,6 +21,29 @@ import { Video, VideoStatus } from '../src/videos/entities/video.entity';
 const BUCKET = process.env.S3_BUCKET ?? 'streamtube-videos';
 const PUBLIC_ENDPOINT =
   process.env.S3_PUBLIC_ENDPOINT ?? 'http://localhost:9000';
+
+interface CreateVideoResponse {
+  id: string;
+  publicId: string;
+  status: string;
+  partSizeBytes: number;
+  partCount: number;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+interface VideoResponse {
+  id: string;
+  publicId: string;
+  status: string;
+  thumbnailUrl: string | null;
+}
+
+function bodyOf<T>(response: { body: unknown }): T {
+  return response.body as T;
+}
 
 describe('videos-create (e2e)', () => {
   let app: INestApplication<App>;
@@ -79,10 +102,7 @@ describe('videos-create (e2e)', () => {
     const videos = await dataSource.getRepository(Video).find();
     for (const video of videos) {
       if (video.upload_id) {
-        await storage.abortMultipartUpload(
-          video.storage_key,
-          video.upload_id,
-        );
+        await storage.abortMultipartUpload(video.storage_key, video.upload_id);
       }
       if (video.thumbnail_key) {
         uploadedKeys.push(video.thumbnail_key);
@@ -101,13 +121,13 @@ describe('videos-create (e2e)', () => {
     email: string,
     password = 'password123',
   ): Promise<string> {
-    const authService = app.get(AuthService);
-    const mailServiceInstance = (authService as any).mailService;
+    const mailService = app.get(MailService);
     let capturedToken = '';
     jest
-      .spyOn(mailServiceInstance, 'sendConfirmationEmail')
-      .mockImplementationOnce(async (_e: string, _n: string, t: string) => {
-        capturedToken = t;
+      .spyOn(mailService, 'sendConfirmationEmail')
+      .mockImplementationOnce((_email, _name, token) => {
+        capturedToken = token;
+        return Promise.resolve();
       });
 
     await request(app.getHttpServer())
@@ -120,7 +140,7 @@ describe('videos-create (e2e)', () => {
       .post('/auth/login')
       .send({ email, password });
 
-    return loginResponse.body.access_token as string;
+    return bodyOf<{ access_token: string }>(loginResponse).access_token;
   }
 
   function createVideoRequest(token: string, body: Record<string, unknown>) {
@@ -139,23 +159,22 @@ describe('videos-create (e2e)', () => {
       sizeBytes: 104857600,
     }).expect(201);
 
-    expect(response.body.id).toMatch(
+    const body = bodyOf<CreateVideoResponse>(response);
+    expect(body.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
-    expect(response.body.publicId).toHaveLength(12);
-    expect(response.body.status).toBe('draft');
-    expect(response.body.partSizeBytes).toBe(67108864);
-    expect(response.body.partCount).toBe(2);
+    expect(body.publicId).toHaveLength(12);
+    expect(body.status).toBe('draft');
+    expect(body.partSizeBytes).toBe(67108864);
+    expect(body.partCount).toBe(2);
 
     const saved = await dataSource
       .getRepository(Video)
-      .findOneBy({ id: response.body.id });
+      .findOneBy({ id: body.id });
     expect(saved).not.toBeNull();
     expect(saved!.status).toBe('draft');
     expect(saved!.upload_id).toBeTruthy();
-    expect(saved!.storage_key).toBe(
-      `videos/${response.body.id}/original.mp4`,
-    );
+    expect(saved!.storage_key).toBe(`videos/${body.id}/original.mp4`);
   });
 
   it('rejects unsupported media types with UNSUPPORTED_MEDIA_TYPE', async () => {
@@ -166,14 +185,18 @@ describe('videos-create (e2e)', () => {
       mimeType: 'application/pdf',
       sizeBytes: 1048576,
     }).expect(415);
-    expect(pdfResponse.body.error).toBe('UNSUPPORTED_MEDIA_TYPE');
+    expect(bodyOf<ErrorResponse>(pdfResponse).error).toBe(
+      'UNSUPPORTED_MEDIA_TYPE',
+    );
 
     const movResponse = await createVideoRequest(token, {
       originalFilename: 'clipe.mov',
       mimeType: 'video/quicktime',
       sizeBytes: 1048576,
     }).expect(415);
-    expect(movResponse.body.error).toBe('UNSUPPORTED_MEDIA_TYPE');
+    expect(bodyOf<ErrorResponse>(movResponse).error).toBe(
+      'UNSUPPORTED_MEDIA_TYPE',
+    );
 
     const count = await dataSource.getRepository(Video).count();
     expect(count).toBe(0);
@@ -188,7 +211,7 @@ describe('videos-create (e2e)', () => {
       sizeBytes: 10737418241,
     }).expect(413);
 
-    expect(response.body.error).toBe('FILE_TOO_LARGE');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('FILE_TOO_LARGE');
     const count = await dataSource.getRepository(Video).count();
     expect(count).toBe(0);
   });
@@ -200,10 +223,7 @@ describe('videos-create (e2e)', () => {
       sizeBytes: 1048576,
     };
 
-    await request(app.getHttpServer())
-      .post('/videos')
-      .send(body)
-      .expect(401);
+    await request(app.getHttpServer()).post('/videos').send(body).expect(401);
 
     await request(app.getHttpServer())
       .post('/videos')
@@ -217,21 +237,21 @@ describe('videos-create (e2e)', () => {
 
   it('rejects access to a video owned by another user', async () => {
     const ownerToken = await registerConfirmAndLogin('owner@example.com');
-    const intruderToken =
-      await registerConfirmAndLogin('intruder@example.com');
+    const intruderToken = await registerConfirmAndLogin('intruder@example.com');
 
-    const created = await createVideoRequest(ownerToken, {
+    const createdResponse = await createVideoRequest(ownerToken, {
       originalFilename: 'meu-video.mp4',
       mimeType: 'video/mp4',
       sizeBytes: 104857600,
     }).expect(201);
+    const created = bodyOf<CreateVideoResponse>(createdResponse);
 
     const response = await request(app.getHttpServer())
-      .get(`/videos/${created.body.id}`)
+      .get(`/videos/${created.id}`)
       .set('Authorization', `Bearer ${intruderToken}`)
       .expect(403);
 
-    expect(response.body.error).toBe('VIDEO_ACCESS_DENIED');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('VIDEO_ACCESS_DENIED');
   });
 
   it('returns VIDEO_NOT_FOUND for an unknown video id', async () => {
@@ -242,38 +262,39 @@ describe('videos-create (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
 
-    expect(response.body.error).toBe('VIDEO_NOT_FOUND');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('VIDEO_NOT_FOUND');
   });
 
   it('returns a draft video with thumbnailUrl null', async () => {
     const token = await registerConfirmAndLogin('draft@example.com');
 
-    const created = await createVideoRequest(token, {
+    const createdResponse = await createVideoRequest(token, {
       originalFilename: 'meu-video.mp4',
       mimeType: 'video/mp4',
       sizeBytes: 104857600,
     }).expect(201);
+    const created = bodyOf<CreateVideoResponse>(createdResponse);
 
     const response = await request(app.getHttpServer())
-      .get(`/videos/${created.body.id}`)
+      .get(`/videos/${created.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(response.body.status).toBe('draft');
-    expect(response.body.thumbnailUrl).toBeNull();
-    expect(response.body.publicId).toBe(created.body.publicId);
+    const body = bodyOf<VideoResponse>(response);
+    expect(body.status).toBe('draft');
+    expect(body.thumbnailUrl).toBeNull();
+    expect(body.publicId).toBe(created.publicId);
   });
 
   it('returns a presigned thumbnail URL for a ready video', async () => {
     const token = await registerConfirmAndLogin('ready@example.com');
 
-    const created = await createVideoRequest(token, {
+    const createdResponse = await createVideoRequest(token, {
       originalFilename: 'meu-video.mp4',
       mimeType: 'video/mp4',
       sizeBytes: 104857600,
     }).expect(201);
-
-    const videoId = created.body.id as string;
+    const videoId = bodyOf<CreateVideoResponse>(createdResponse).id;
     const thumbnailKey = `videos/${videoId}/thumbnail.jpg`;
 
     const dir = await mkdtemp(join(tmpdir(), 'videos-e2e-'));
@@ -293,9 +314,10 @@ describe('videos-create (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(response.body.thumbnailUrl).toBeTruthy();
-    const thumbnailUrl = new URL(response.body.thumbnailUrl as string);
-    expect(thumbnailUrl.origin).toBe(PUBLIC_ENDPOINT);
-    expect(thumbnailUrl.searchParams.get('X-Amz-Expires')).toBe('3600');
+    const thumbnailUrl = bodyOf<VideoResponse>(response).thumbnailUrl;
+    expect(thumbnailUrl).toBeTruthy();
+    const parsedUrl = new URL(thumbnailUrl as string);
+    expect(parsedUrl.origin).toBe(PUBLIC_ENDPOINT);
+    expect(parsedUrl.searchParams.get('X-Amz-Expires')).toBe('3600');
   });
 });

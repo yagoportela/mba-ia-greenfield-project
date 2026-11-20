@@ -75,7 +75,11 @@ export class MediaToolsService {
     return new Promise((resolve, reject) => {
       execFile(command, args, (error, stdout) => {
         if (error) {
-          reject(error);
+          reject(
+            error instanceof Error
+              ? error
+              : new Error(`${command} command failed`),
+          );
           return;
         }
         resolve(stdout.toString());

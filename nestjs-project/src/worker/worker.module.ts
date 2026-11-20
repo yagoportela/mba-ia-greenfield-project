@@ -1,10 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  Injectable,
-  Logger,
-  Module,
-  type OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, Module, type OnModuleInit } from '@nestjs/common';
 import { ConfigModule, type ConfigType } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
@@ -47,9 +42,7 @@ class SweepScheduler implements OnModuleInit {
       },
     );
 
-    this.logger.log(
-      'Reconciliation sweep scheduled every 15 minutes',
-    );
+    this.logger.log('Reconciliation sweep scheduled every 15 minutes');
   }
 }
 

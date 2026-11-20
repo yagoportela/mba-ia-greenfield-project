@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
-**SIs:** 10/11 completed
+**Status:** completed
+**SIs:** 11/11 completed
 
 ### SI-03.1 — Dependências, namespaces de configuração e validação de env
 - **Status:** completed
@@ -94,6 +94,10 @@
   - Verificado em runtime: `getRepeatableJobs()` mostra `sweep` a cada 900000ms e o worker consumiu um job `sweep` manual (`completed`), logando "0 stuck processing re-enqueued, 0 abandoned uploads removed".
 
 ### SI-03.11 — Exportação do contrato OpenAPI
-- **Status:** pending
-- **Tests:** pending
-- **Observations:** pending
+- **Status:** completed
+- **Tests:** 13 passing
+- **Observations:**
+  - `openapi.json` regenerado via `npm run openapi:export` com os seis endpoints da fase; cada um referencia `#/components/schemas/ApiErrorEnvelope` nos status de erro e expõe `security: access-token`.
+  - `src/openapi-export.integration-spec.ts` estendido com checagens de paths, summaries, security e refs de erro (13 testes passando).
+  - `npm run lint` continua vermelho apenas por 150 erros/40 warnings pré-existentes em 11 arquivos da fase 01/02 (auth.e2e-spec 48, auth.service.spec 45, etc.); por decisão do usuário, só os arquivos da fase 03 foram corrigidos — esses agora estão com 0 erros.
+  - O cleanup de lint tipou os bodies de supertest (`bodyOf<T>`) e os acessos a `mock.calls`; o e2e de upload agora pausa a fila `video-processing` durante a suíte para o `media-worker` (rodando em dev) não travar jobs antes do cleanup.

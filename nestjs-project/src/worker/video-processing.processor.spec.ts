@@ -115,14 +115,13 @@ describe('VideoProcessingProcessor (unit)', () => {
       'image/jpeg',
     );
 
-    const saved = videoRepository.save.mock.calls[0][0] as Video;
+    const saveCalls = videoRepository.save.mock.calls as [Video][];
+    const saved = saveCalls[0][0];
     expect(saved.status).toBe(VideoStatus.Ready);
     expect(saved.duration_seconds).toBe('100.000');
     expect(saved.width).toBe(1920);
     expect(saved.height).toBe(1080);
-    expect(saved.thumbnail_key).toBe(
-      'videos/video-id/thumbnail.jpg',
-    );
+    expect(saved.thumbnail_key).toBe('videos/video-id/thumbnail.jpg');
     expect(saved.failure_reason).toBeNull();
   });
 
@@ -140,11 +139,10 @@ describe('VideoProcessingProcessor (unit)', () => {
     await processor.process(buildJob());
 
     expect(videoRepository.save).toHaveBeenCalledTimes(2);
-    const saved = videoRepository.save.mock.calls[1][0] as Video;
+    const saveCalls = videoRepository.save.mock.calls as [Video][];
+    const saved = saveCalls[1][0];
     expect(saved.status).toBe(VideoStatus.Ready);
-    expect(saved.thumbnail_key).toBe(
-      'videos/video-id/thumbnail.jpg',
-    );
+    expect(saved.thumbnail_key).toBe('videos/video-id/thumbnail.jpg');
   });
 
   it('should rethrow without marking failed when the attempt is not the last', async () => {
@@ -167,15 +165,14 @@ describe('VideoProcessingProcessor (unit)', () => {
 
   it('should mark the video as failed on the last attempt', async () => {
     videoRepository.findOneBy.mockResolvedValue(buildVideo());
-    mediaToolsService.probe.mockRejectedValue(
-      new Error('ffprobe exploded'),
-    );
+    mediaToolsService.probe.mockRejectedValue(new Error('ffprobe exploded'));
 
     await expect(
       processor.process(buildJob({ attemptsMade: 2, attempts: 3 })),
     ).rejects.toThrow('ffprobe exploded');
 
-    const saved = videoRepository.save.mock.calls[0][0] as Video;
+    const saveCalls = videoRepository.save.mock.calls as [Video][];
+    const saved = saveCalls[0][0];
     expect(saved.status).toBe(VideoStatus.Failed);
     expect(saved.failure_reason).toContain('ffprobe exploded');
   });
@@ -190,7 +187,8 @@ describe('VideoProcessingProcessor (unit)', () => {
       processor.process(buildJob({ attemptsMade: 2, attempts: 3 })),
     ).rejects.toThrow('storage unavailable');
 
-    const saved = videoRepository.save.mock.calls[0][0] as Video;
+    const saveCalls = videoRepository.save.mock.calls as [Video][];
+    const saved = saveCalls[0][0];
     expect(saved.status).toBe(VideoStatus.Failed);
     expect(saved.failure_reason).toContain('storage unavailable');
   });

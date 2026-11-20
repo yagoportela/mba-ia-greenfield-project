@@ -90,9 +90,7 @@ describe('VideosService (unit)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    videoRepository.create.mockImplementation(
-      (input: Partial<Video>) => input,
-    );
+    videoRepository.create.mockImplementation((input: Partial<Video>) => input);
 
     const module = await Test.createTestingModule({
       providers: [
@@ -112,9 +110,8 @@ describe('VideosService (unit)', () => {
     storageService.createMultipartUpload.mockResolvedValue({
       uploadId: 'upload-1',
     });
-    videoRepository.save.mockImplementation(
-      (entity: Partial<Video>) =>
-        buildSavedVideo(entity as Partial<Video>),
+    videoRepository.save.mockImplementation((entity: Partial<Video>) =>
+      buildSavedVideo(entity),
     );
   }
 
@@ -136,15 +133,14 @@ describe('VideosService (unit)', () => {
       'video/mp4',
     );
 
-    const savedInput = videoRepository.create.mock.calls[0][0] as Video;
+    const createCalls = videoRepository.create.mock.calls as [Video][];
+    const savedInput = createCalls[0][0];
     expect(savedInput.id).toBe(videoId);
     expect(savedInput.public_id).toHaveLength(12);
     expect(savedInput.channel_id).toBe('channel-1');
     expect(savedInput.status).toBe(VideoStatus.Draft);
     expect(savedInput.upload_id).toBe('upload-1');
-    expect(savedInput.storage_key).toBe(
-      `videos/${videoId}/original.mp4`,
-    );
+    expect(savedInput.storage_key).toBe(`videos/${videoId}/original.mp4`);
     expect(savedInput.size_bytes).toBe('104857600');
 
     expect(result).toEqual({
@@ -160,19 +156,14 @@ describe('VideosService (unit)', () => {
     mockSuccessfulDraft();
     videoRepository.save
       .mockRejectedValueOnce(buildUniqueViolation('public_id'))
-      .mockImplementation((entity: Partial<Video>) =>
-        buildSavedVideo(entity as Partial<Video>),
-      );
+      .mockImplementation((entity: Partial<Video>) => buildSavedVideo(entity));
 
     await service.createDraft('user-1', VALID_DTO);
 
     expect(videoRepository.save).toHaveBeenCalledTimes(2);
-    const firstPublicId = (
-      videoRepository.create.mock.calls[0][0] as Video
-    ).public_id;
-    const secondPublicId = (
-      videoRepository.create.mock.calls[1][0] as Video
-    ).public_id;
+    const createCalls = videoRepository.create.mock.calls as [Video][];
+    const firstPublicId = createCalls[0][0].public_id;
+    const secondPublicId = createCalls[1][0].public_id;
     expect(firstPublicId).not.toBe(secondPublicId);
   });
 
@@ -264,9 +255,7 @@ describe('VideosService (unit)', () => {
 
     const detail = await service.findOwnedById('user-1', 'video-id');
 
-    expect(detail.thumbnailUrl).toBe(
-      'http://localhost:9000/bucket/thumbnail',
-    );
+    expect(detail.thumbnailUrl).toBe('http://localhost:9000/bucket/thumbnail');
     expect(storageService.presignGetObject).toHaveBeenCalledWith(
       'videos/video-id/thumbnail.jpg',
     );
@@ -295,9 +284,11 @@ describe('VideosService (unit)', () => {
         Promise.resolve(`http://public/bucket/part-${partNumber}`),
     );
 
-    const parts = await service.presignUploadParts('user-1', 'video-id', [
-      1, 2,
-    ]);
+    const parts = await service.presignUploadParts(
+      'user-1',
+      'video-id',
+      [1, 2],
+    );
 
     expect(storageService.presignUploadPart).toHaveBeenCalledTimes(2);
     expect(storageService.presignUploadPart).toHaveBeenCalledWith(
@@ -368,9 +359,8 @@ describe('VideosService (unit)', () => {
         etag: '"etag"',
       }),
     );
-    videoRepository.save.mockImplementation(
-      (entity: Partial<Video>) =>
-        buildSavedVideo(entity as Partial<Video>),
+    videoRepository.save.mockImplementation((entity: Partial<Video>) =>
+      buildSavedVideo(entity),
     );
 
     const result = await service.completeUpload('user-1', 'video-id', {
@@ -389,7 +379,8 @@ describe('VideosService (unit)', () => {
       ],
     );
 
-    const savedInput = videoRepository.save.mock.calls[0][0] as Video;
+    const saveCalls = videoRepository.save.mock.calls as [Video][];
+    const savedInput = saveCalls[0][0];
     expect(savedInput.status).toBe(VideoStatus.Processing);
     expect(savedInput.upload_id).toBeNull();
     expect(savedInput.size_bytes).toBe('104857600');

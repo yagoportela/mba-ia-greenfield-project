@@ -48,24 +48,25 @@ describe('ReconciliationService (unit)', () => {
 
     expect(count).toBe(2);
     expect(videoQueueService.enqueueProcessing).toHaveBeenCalledTimes(2);
-    expect(videoQueueService.enqueueProcessing).toHaveBeenCalledWith(
-      'video-1',
-    );
-    expect(videoQueueService.enqueueProcessing).toHaveBeenCalledWith(
-      'video-2',
-    );
+    expect(videoQueueService.enqueueProcessing).toHaveBeenCalledWith('video-1');
+    expect(videoQueueService.enqueueProcessing).toHaveBeenCalledWith('video-2');
 
-    const query = videoRepository.find.mock.calls[0][0] as {
-      where: {
-        status: VideoStatus;
-        updated_at: FindOperator<Date>;
-      };
-      select: string[];
-    };
+    const findCalls = videoRepository.find.mock.calls as [
+      [
+        {
+          where: {
+            status: VideoStatus;
+            updated_at: FindOperator<Date>;
+          };
+          select: string[];
+        },
+      ],
+    ];
+    const query = findCalls[0][0];
     expect(query.where.status).toBe(VideoStatus.Processing);
     expect(query.select).toEqual(['id']);
 
-    const cutoff = query.where.updated_at.value as Date;
+    const cutoff = query.where.updated_at.value;
     const ageMs = Date.now() - cutoff.getTime();
     expect(ageMs).toBeGreaterThan(30 * 60 * 1000 - 5000);
     expect(ageMs).toBeLessThan(30 * 60 * 1000 + 5000);
@@ -97,17 +98,22 @@ describe('ReconciliationService (unit)', () => {
     );
     expect(videoRepository.remove).toHaveBeenCalledTimes(2);
 
-    const query = videoRepository.find.mock.calls[0][0] as {
-      where: {
-        status: VideoStatus;
-        upload_id: FindOperator<unknown>;
-        created_at: FindOperator<Date>;
-      };
-    };
+    const findCalls = videoRepository.find.mock.calls as [
+      [
+        {
+          where: {
+            status: VideoStatus;
+            upload_id: FindOperator<unknown>;
+            created_at: FindOperator<Date>;
+          };
+        },
+      ],
+    ];
+    const query = findCalls[0][0];
     expect(query.where.status).toBe(VideoStatus.Draft);
     expect(query.where.upload_id.type).toBe('not');
 
-    const cutoff = query.where.created_at.value as Date;
+    const cutoff = query.where.created_at.value;
     const ageMs = Date.now() - cutoff.getTime();
     expect(ageMs).toBeGreaterThan(24 * 60 * 60 * 1000 - 5000);
     expect(ageMs).toBeLessThan(24 * 60 * 60 * 1000 + 5000);

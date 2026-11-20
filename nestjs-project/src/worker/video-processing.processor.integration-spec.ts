@@ -178,9 +178,7 @@ describe('VideoProcessingProcessor (integration)', () => {
     expect(saved!.duration_seconds).toBe('12.500');
     expect(saved!.width).toBe(640);
     expect(saved!.height).toBe(360);
-    expect(saved!.thumbnail_key).toBe(
-      `videos/${video.id}/thumbnail.jpg`,
-    );
+    expect(saved!.thumbnail_key).toBe(`videos/${video.id}/thumbnail.jpg`);
 
     createdKeys.push(saved!.thumbnail_key!);
     const thumbnail = await storage.headObject(saved!.thumbnail_key!);
@@ -191,9 +189,7 @@ describe('VideoProcessingProcessor (integration)', () => {
 
     saved = await videoRepository.findOneBy({ id: video.id });
     expect(saved!.status).toBe(VideoStatus.Ready);
-    expect(saved!.thumbnail_key).toBe(
-      `videos/${video.id}/thumbnail.jpg`,
-    );
+    expect(saved!.thumbnail_key).toBe(`videos/${video.id}/thumbnail.jpg`);
   }, 60000);
 
   it('should mark the video as failed with a reason on the last attempt', async () => {
@@ -203,9 +199,9 @@ describe('VideoProcessingProcessor (integration)', () => {
       new Error('invalid media stream'),
     );
 
-    await expect(
-      processor.process(buildJob(video.id, 2, 3)),
-    ).rejects.toThrow('invalid media stream');
+    await expect(processor.process(buildJob(video.id, 2, 3))).rejects.toThrow(
+      'invalid media stream',
+    );
 
     const saved = await videoRepository.findOneBy({ id: video.id });
     expect(saved!.status).toBe(VideoStatus.Failed);

@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes, randomUUID } from 'node:crypto';
-import {
-  FindOptionsWhere,
-  QueryFailedError,
-  Repository,
-} from 'typeorm';
+import { FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
 
 import { ChannelsService } from '../channels/channels.service';
 import {
@@ -48,10 +44,7 @@ function extractExtension(filename: string): string {
   return filename.slice(lastDot + 1).toLowerCase();
 }
 
-function isUniqueViolationOnColumn(
-  error: unknown,
-  column: string,
-): boolean {
+function isUniqueViolationOnColumn(error: unknown, column: string): boolean {
   if (!(error instanceof QueryFailedError)) {
     return false;
   }
@@ -135,10 +128,7 @@ export class VideosService {
     }
 
     const videoId = randomUUID();
-    const storageKey = this.storageService.buildOriginalKey(
-      videoId,
-      extension,
-    );
+    const storageKey = this.storageService.buildOriginalKey(videoId, extension);
 
     let uploadId: string;
     try {
@@ -190,9 +180,7 @@ export class VideosService {
       mimeType: video.mime_type,
       sizeBytes: Number(video.size_bytes),
       durationSeconds:
-        video.duration_seconds === null
-          ? null
-          : Number(video.duration_seconds),
+        video.duration_seconds === null ? null : Number(video.duration_seconds),
       width: video.width,
       height: video.height,
       thumbnailUrl,
@@ -201,10 +189,7 @@ export class VideosService {
     };
   }
 
-  async getPlaybackUrl(
-    userId: string,
-    publicId: string,
-  ): Promise<DeliveryUrl> {
+  async getPlaybackUrl(userId: string, publicId: string): Promise<DeliveryUrl> {
     const video = await this.findOwnedVideoByPublicId(userId, publicId);
     this.assertVideoReady(video);
 
@@ -220,16 +205,12 @@ export class VideosService {
     }
   }
 
-  async getDownloadUrl(
-    userId: string,
-    publicId: string,
-  ): Promise<DeliveryUrl> {
+  async getDownloadUrl(userId: string, publicId: string): Promise<DeliveryUrl> {
     const video = await this.findOwnedVideoByPublicId(userId, publicId);
     this.assertVideoReady(video);
 
     const filename = sanitizeOriginalFilename(video.original_filename);
-    const responseContentDisposition =
-      `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
+    const responseContentDisposition = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
 
     try {
       const url = await this.storageService.presignGetObject(
@@ -322,10 +303,7 @@ export class VideosService {
     };
   }
 
-  private async findOwnedVideo(
-    userId: string,
-    id: string,
-  ): Promise<Video> {
+  private async findOwnedVideo(userId: string, id: string): Promise<Video> {
     return this.findOwnedVideoWhere(userId, { id });
   }
 
@@ -382,9 +360,7 @@ export class VideosService {
       throw new UploadIncompleteException();
     }
 
-    const partNumbers = new Set(
-      parts.map((part) => part.partNumber),
-    );
+    const partNumbers = new Set(parts.map((part) => part.partNumber));
     if (partNumbers.size !== partCount) {
       throw new UploadIncompleteException();
     }

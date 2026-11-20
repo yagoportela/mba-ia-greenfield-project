@@ -9,10 +9,10 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
-import { AuthService } from '../src/auth/auth.service';
 import { DomainExceptionFilter } from '../src/common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
 import storageConfig from '../src/config/storage.config';
+import { MailService } from '../src/mail/mail.service';
 import { StorageService } from '../src/storage/storage.service';
 import { cleanAllTables } from '../src/test/create-test-data-source';
 import { Video } from '../src/videos/entities/video.entity';
@@ -20,6 +20,34 @@ import { VIDEO_PROCESSING_QUEUE } from '../src/videos/videos.constants';
 
 const BUCKET = process.env.S3_BUCKET ?? 'streamtube-videos';
 const PUBLIC_ENDPOINT = process.env.S3_ENDPOINT ?? 'http://minio:9000';
+
+interface CreateDraftResponse {
+  id: string;
+  publicId: string;
+  partCount: number;
+}
+
+interface PartsResponse {
+  parts: {
+    partNumber: number;
+    url: string;
+    expiresInSeconds: number;
+  }[];
+}
+
+interface CompleteResponse {
+  id: string;
+  publicId: string;
+  status: string;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+function bodyOf<T>(response: { body: unknown }): T {
+  return response.body as T;
+}
 
 describe('videos-upload (e2e)', () => {
   let app: INestApplication<App>;
@@ -58,6 +86,7 @@ describe('videos-upload (e2e)', () => {
     dataSource = moduleFixture.get(DataSource);
     storage = moduleFixture.get(StorageService);
     queue = moduleFixture.get<Queue>(getQueueToken(VIDEO_PROCESSING_QUEUE));
+    await queue.pause();
     throttlerStorage =
       moduleFixture.get<ThrottlerStorageService>(ThrottlerStorage);
 
@@ -73,6 +102,7 @@ describe('videos-upload (e2e)', () => {
   });
 
   afterAll(async () => {
+    await queue.resume();
     s3Client.destroy();
     await app.close();
   });
@@ -87,16 +117,13 @@ describe('videos-upload (e2e)', () => {
 
     for (const videoId of createdVideoIds) {
       const job = await queue.getJob(videoId);
-      await job?.remove();
+      await job?.remove().catch(() => undefined);
     }
 
     const videos = await videoRepository.find();
     for (const video of videos) {
       if (video.upload_id) {
-        await storage.abortMultipartUpload(
-          video.storage_key,
-          video.upload_id,
-        );
+        await storage.abortMultipartUpload(video.storage_key, video.upload_id);
       } else {
         await s3Client.send(
           new DeleteObjectCommand({
@@ -114,13 +141,13 @@ describe('videos-upload (e2e)', () => {
     email: string,
     password = 'password123',
   ): Promise<string> {
-    const authService = app.get(AuthService);
-    const mailServiceInstance = (authService as any).mailService;
+    const mailService = app.get(MailService);
     let capturedToken = '';
     jest
-      .spyOn(mailServiceInstance, 'sendConfirmationEmail')
-      .mockImplementationOnce(async (_e: string, _n: string, t: string) => {
-        capturedToken = t;
+      .spyOn(mailService, 'sendConfirmationEmail')
+      .mockImplementationOnce((_email, _name, token) => {
+        capturedToken = token;
+        return Promise.resolve();
       });
 
     await request(app.getHttpServer())
@@ -133,13 +160,13 @@ describe('videos-upload (e2e)', () => {
       .post('/auth/login')
       .send({ email, password });
 
-    return loginResponse.body.access_token as string;
+    return bodyOf<{ access_token: string }>(loginResponse).access_token;
   }
 
   async function createDraft(
     token: string,
     sizeBytes: number,
-  ): Promise<{ id: string; publicId: string; partCount: number }> {
+  ): Promise<CreateDraftResponse> {
     const response = await request(app.getHttpServer())
       .post('/videos')
       .set('Authorization', `Bearer ${token}`)
@@ -150,12 +177,9 @@ describe('videos-upload (e2e)', () => {
       })
       .expect(201);
 
-    createdVideoIds.push(response.body.id as string);
-    return {
-      id: response.body.id as string,
-      publicId: response.body.publicId as string,
-      partCount: response.body.partCount as number,
-    };
+    const created = bodyOf<CreateDraftResponse>(response);
+    createdVideoIds.push(created.id);
+    return created;
   }
 
   async function presignPart(
@@ -169,7 +193,7 @@ describe('videos-upload (e2e)', () => {
       .send({ partNumbers: [partNumber] })
       .expect(200);
 
-    return response.body.parts[0].url as string;
+    return bodyOf<PartsResponse>(response).parts[0].url;
   }
 
   async function uploadPart(url: string, body: Buffer): Promise<string> {
@@ -205,11 +229,7 @@ describe('videos-upload (e2e)', () => {
       .send({ partNumbers: [1, 2] })
       .expect(200);
 
-    const parts = response.body.parts as {
-      partNumber: number;
-      url: string;
-      expiresInSeconds: number;
-    }[];
+    const parts = bodyOf<PartsResponse>(response).parts;
     expect(parts).toHaveLength(2);
 
     for (const [index, part] of parts.entries()) {
@@ -219,9 +239,7 @@ describe('videos-upload (e2e)', () => {
       const url = new URL(part.url);
       expect(url.origin).toBe(PUBLIC_ENDPOINT);
       expect(url.searchParams.get('X-Amz-Expires')).toBe('3600');
-      expect(url.searchParams.get('partNumber')).toBe(
-        String(part.partNumber),
-      );
+      expect(url.searchParams.get('partNumber')).toBe(String(part.partNumber));
     }
 
     const resigned = await request(app.getHttpServer())
@@ -230,11 +248,10 @@ describe('videos-upload (e2e)', () => {
       .send({ partNumbers: [2] })
       .expect(200);
 
-    expect(resigned.body.parts).toHaveLength(1);
-    expect(resigned.body.parts[0].partNumber).toBe(2);
-    expect(
-      new URL(resigned.body.parts[0].url as string).origin,
-    ).toBe(PUBLIC_ENDPOINT);
+    const resignedParts = bodyOf<PartsResponse>(resigned).parts;
+    expect(resignedParts).toHaveLength(1);
+    expect(resignedParts[0].partNumber).toBe(2);
+    expect(new URL(resignedParts[0].url).origin).toBe(PUBLIC_ENDPOINT);
   });
 
   it('rejects presigning parts for a video that left the draft state', async () => {
@@ -243,9 +260,9 @@ describe('videos-upload (e2e)', () => {
 
     const partUrl = await presignPart(token, draft.id, 1);
     const etag = await uploadPart(partUrl, Buffer.alloc(1024 * 1024, 3));
-    await completeUpload(token, draft.id, [
-      { partNumber: 1, etag },
-    ]).expect(202);
+    await completeUpload(token, draft.id, [{ partNumber: 1, etag }]).expect(
+      202,
+    );
 
     const response = await request(app.getHttpServer())
       .post(`/videos/${draft.id}/upload-parts`)
@@ -253,7 +270,7 @@ describe('videos-upload (e2e)', () => {
       .send({ partNumbers: [1] })
       .expect(409);
 
-    expect(response.body.error).toBe('INVALID_UPLOAD_STATE');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('INVALID_UPLOAD_STATE');
   });
 
   it('completes the upload, transitions to processing and enqueues the job', async () => {
@@ -268,7 +285,7 @@ describe('videos-upload (e2e)', () => {
       { partNumber: 1, etag },
     ]).expect(202);
 
-    expect(response.body).toEqual({
+    expect(bodyOf<CompleteResponse>(response)).toEqual({
       id: draft.id,
       publicId: draft.publicId,
       status: 'processing',
@@ -292,7 +309,7 @@ describe('videos-upload (e2e)', () => {
 
     const response = await completeUpload(token, draft.id, []).expect(400);
 
-    expect(response.body.error).toBe('UPLOAD_INCOMPLETE');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('UPLOAD_INCOMPLETE');
 
     const saved = await dataSource
       .getRepository(Video)
@@ -307,15 +324,15 @@ describe('videos-upload (e2e)', () => {
     const partUrl = await presignPart(token, draft.id, 1);
     const etag = await uploadPart(partUrl, Buffer.alloc(1024 * 1024, 9));
 
-    await completeUpload(token, draft.id, [
-      { partNumber: 1, etag },
-    ]).expect(202);
+    await completeUpload(token, draft.id, [{ partNumber: 1, etag }]).expect(
+      202,
+    );
 
     const response = await completeUpload(token, draft.id, [
       { partNumber: 1, etag },
     ]).expect(409);
 
-    expect(response.body.error).toBe('INVALID_UPLOAD_STATE');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('INVALID_UPLOAD_STATE');
 
     const jobs = await queue.getJobs([
       'waiting',

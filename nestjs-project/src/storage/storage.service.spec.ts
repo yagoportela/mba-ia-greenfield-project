@@ -91,10 +91,14 @@ describe('StorageService (unit)', () => {
   it('should send CompleteMultipartUploadCommand mapping parts to the SDK shape', async () => {
     sendSpy.mockResolvedValue({});
 
-    await service.completeMultipartUpload('videos/video-id/original.mp4', 'upload-abc', [
-      { partNumber: 1, etag: '"etag-1"' },
-      { partNumber: 2, etag: '"etag-2"' },
-    ]);
+    await service.completeMultipartUpload(
+      'videos/video-id/original.mp4',
+      'upload-abc',
+      [
+        { partNumber: 1, etag: '"etag-1"' },
+        { partNumber: 2, etag: '"etag-2"' },
+      ],
+    );
 
     const command = sendSpy.mock.calls[0][0] as CompleteMultipartUploadCommand;
     expect(command).toBeInstanceOf(CompleteMultipartUploadCommand);
@@ -110,7 +114,10 @@ describe('StorageService (unit)', () => {
   it('should send AbortMultipartUploadCommand for the given key and upload', async () => {
     sendSpy.mockResolvedValue({});
 
-    await service.abortMultipartUpload('videos/video-id/original.mp4', 'upload-abc');
+    await service.abortMultipartUpload(
+      'videos/video-id/original.mp4',
+      'upload-abc',
+    );
 
     const command = sendSpy.mock.calls[0][0] as AbortMultipartUploadCommand;
     expect(command).toBeInstanceOf(AbortMultipartUploadCommand);
@@ -144,20 +151,16 @@ describe('StorageService (unit)', () => {
   });
 
   it('should presign a GET embedding the response content disposition', async () => {
-    const url = await service.presignGetObject(
-      'videos/video-id/original.mp4',
-      {
-        responseContentDisposition:
-          'attachment; filename="my video.mp4"',
-      },
-    );
+    const url = await service.presignGetObject('videos/video-id/original.mp4', {
+      responseContentDisposition: 'attachment; filename="my video.mp4"',
+    });
 
     const parsed = new URL(url);
     expect(parsed.origin).toBe('http://storage.example.test:9000');
     expect(parsed.pathname).toBe('/test-bucket/videos/video-id/original.mp4');
-    expect(
-      parsed.searchParams.get('response-content-disposition'),
-    ).toBe('attachment; filename="my video.mp4"');
+    expect(parsed.searchParams.get('response-content-disposition')).toBe(
+      'attachment; filename="my video.mp4"',
+    );
     expect(parsed.searchParams.get('X-Amz-Expires')).toBe('3600');
     expect(parsed.searchParams.has('x-amz-checksum-mode')).toBe(false);
   });

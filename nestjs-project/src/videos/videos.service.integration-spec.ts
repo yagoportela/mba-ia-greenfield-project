@@ -1,10 +1,7 @@
 import type { ConfigType } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  DeleteObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'node:crypto';
 import { DataSource, Repository } from 'typeorm';
 
@@ -156,9 +153,7 @@ describe('VideosService (integration)', () => {
     expect(saved).not.toBeNull();
     expect(saved!.status).toBe(VideoStatus.Draft);
     expect(saved!.upload_id).toBeTruthy();
-    expect(saved!.storage_key).toBe(
-      `videos/${result.id}/original.mp4`,
-    );
+    expect(saved!.storage_key).toBe(`videos/${result.id}/original.mp4`);
     expect(saved!.channel_id).toBe(channel.id);
     expect(saved!.channel.user_id).toBe(user.id);
 
@@ -232,9 +227,7 @@ describe('VideosService (integration)', () => {
     });
     expect(created.partCount).toBe(1);
 
-    const [part] = await service.presignUploadParts(user.id, created.id, [
-      1,
-    ]);
+    const [part] = await service.presignUploadParts(user.id, created.id, [1]);
     const body = Buffer.alloc(1024 * 1024, 7);
     const putResponse = await fetch(part.url, {
       method: 'PUT',
@@ -291,9 +284,9 @@ describe('VideosService (integration)', () => {
     const playbackUrl = new URL(playback.url);
     expect(playbackUrl.origin).toBe(TEST_CONFIG.publicEndpoint);
     expect(playbackUrl.searchParams.get('X-Amz-Expires')).toBe('3600');
-    expect(
-      playbackUrl.searchParams.has('response-content-disposition'),
-    ).toBe(false);
+    expect(playbackUrl.searchParams.has('response-content-disposition')).toBe(
+      false,
+    );
 
     const ttlMs = new Date(playback.expiresAt).getTime() - Date.now();
     expect(ttlMs).toBeGreaterThan(3500 * 1000);
@@ -304,9 +297,7 @@ describe('VideosService (integration)', () => {
       created.publicId,
     );
     const downloadUrl = new URL(download.url);
-    expect(
-      downloadUrl.searchParams.get('response-content-disposition'),
-    ).toBe(
+    expect(downloadUrl.searchParams.get('response-content-disposition')).toBe(
       "attachment; filename*=UTF-8''Meu%20V%C3%ADdeo%20A%C3%A7%C3%A3o.mp4",
     );
 

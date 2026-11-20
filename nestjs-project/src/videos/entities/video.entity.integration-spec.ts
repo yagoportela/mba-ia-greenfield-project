@@ -80,9 +80,7 @@ describe('Video entity (integration)', () => {
 
   it('should enforce unique public_id constraint', async () => {
     const channel = await createChannel();
-    await videoRepository.save(
-      videoRepository.create(buildVideo(channel.id)),
-    );
+    await videoRepository.save(videoRepository.create(buildVideo(channel.id)));
 
     await expect(
       videoRepository.save(
@@ -97,9 +95,7 @@ describe('Video entity (integration)', () => {
 
   it('should enforce unique storage_key constraint', async () => {
     const channel = await createChannel();
-    await videoRepository.save(
-      videoRepository.create(buildVideo(channel.id)),
-    );
+    await videoRepository.save(videoRepository.create(buildVideo(channel.id)));
 
     await expect(
       videoRepository.save(

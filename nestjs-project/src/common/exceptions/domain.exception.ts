@@ -57,11 +57,7 @@ export class VideoNotFoundException extends DomainException {
 
 export class VideoAccessDeniedException extends DomainException {
   constructor() {
-    super(
-      'VIDEO_ACCESS_DENIED',
-      403,
-      'You do not have access to this video',
-    );
+    super('VIDEO_ACCESS_DENIED', 403, 'You do not have access to this video');
   }
 }
 
@@ -79,11 +75,7 @@ export class UnsupportedMediaTypeException extends DomainException {
 
 export class FileTooLargeException extends DomainException {
   constructor() {
-    super(
-      'FILE_TOO_LARGE',
-      413,
-      'File exceeds the maximum allowed size',
-    );
+    super('FILE_TOO_LARGE', 413, 'File exceeds the maximum allowed size');
   }
 }
 

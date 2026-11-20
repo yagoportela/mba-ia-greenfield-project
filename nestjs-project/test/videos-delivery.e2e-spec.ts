@@ -11,11 +11,11 @@ import { App } from 'supertest/types';
 import { DataSource, Repository } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
-import { AuthService } from '../src/auth/auth.service';
 import { Channel } from '../src/channels/entities/channel.entity';
 import { DomainExceptionFilter } from '../src/common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
 import storageConfig from '../src/config/storage.config';
+import { MailService } from '../src/mail/mail.service';
 import { StorageService } from '../src/storage/storage.service';
 import { cleanAllTables } from '../src/test/create-test-data-source';
 import { User } from '../src/users/entities/user.entity';
@@ -23,6 +23,19 @@ import { Video, VideoStatus } from '../src/videos/entities/video.entity';
 
 const BUCKET = process.env.S3_BUCKET ?? 'streamtube-videos';
 const PUBLIC_ENDPOINT = process.env.S3_ENDPOINT ?? 'http://minio:9000';
+
+interface DeliveryResponse {
+  url: string;
+  expiresAt: string;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+function bodyOf<T>(response: { body: unknown }): T {
+  return response.body as T;
+}
 
 describe('videos-delivery (e2e)', () => {
   let app: INestApplication<App>;
@@ -102,13 +115,13 @@ describe('videos-delivery (e2e)', () => {
     email: string,
     password = 'password123',
   ): Promise<string> {
-    const authService = app.get(AuthService);
-    const mailServiceInstance = (authService as any).mailService;
+    const mailService = app.get(MailService);
     let capturedToken = '';
     jest
-      .spyOn(mailServiceInstance, 'sendConfirmationEmail')
-      .mockImplementationOnce(async (_e: string, _n: string, t: string) => {
-        capturedToken = t;
+      .spyOn(mailService, 'sendConfirmationEmail')
+      .mockImplementationOnce((_email, _name, token) => {
+        capturedToken = token;
+        return Promise.resolve();
       });
 
     await request(app.getHttpServer())
@@ -121,7 +134,7 @@ describe('videos-delivery (e2e)', () => {
       .post('/auth/login')
       .send({ email, password });
 
-    return loginResponse.body.access_token as string;
+    return bodyOf<{ access_token: string }>(loginResponse).access_token;
   }
 
   async function prepareVideo(
@@ -149,10 +162,7 @@ describe('videos-delivery (e2e)', () => {
     );
   }
 
-  async function uploadOriginal(
-    video: Video,
-    content: Buffer,
-  ): Promise<void> {
+  async function uploadOriginal(video: Video, content: Buffer): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), 'delivery-e2e-'));
     const filePath = join(dir, 'original.mp4');
     await writeFile(filePath, content);
@@ -169,10 +179,7 @@ describe('videos-delivery (e2e)', () => {
 
   it('returns a presigned playback URL that supports range requests', async () => {
     const token = await registerConfirmAndLogin('playback@example.com');
-    const video = await prepareVideo(
-      'playback@example.com',
-      VideoStatus.Ready,
-    );
+    const video = await prepareVideo('playback@example.com', VideoStatus.Ready);
     const content = Buffer.alloc(2048, 0x61);
     await uploadOriginal(video, content);
 
@@ -181,12 +188,13 @@ describe('videos-delivery (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    const playbackUrl = new URL(response.body.url as string);
+    const playback = bodyOf<DeliveryResponse>(response);
+    const playbackUrl = new URL(playback.url);
     expect(playbackUrl.origin).toBe(PUBLIC_ENDPOINT);
     expect(playbackUrl.searchParams.get('X-Amz-Expires')).toBe('3600');
-    expectFreshExpiresAt(response.body.expiresAt as string);
+    expectFreshExpiresAt(playback.expiresAt);
 
-    const rangeResponse = await fetch(response.body.url as string, {
+    const rangeResponse = await fetch(playback.url, {
       headers: { Range: 'bytes=0-1023' },
     });
     expect(rangeResponse.status).toBe(206);
@@ -208,13 +216,12 @@ describe('videos-delivery (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(409);
 
-    expect(response.body.error).toBe('VIDEO_NOT_READY');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('VIDEO_NOT_READY');
   });
 
   it('rejects playback from a user who does not own the video', async () => {
     await registerConfirmAndLogin('owner@example.com');
-    const intruderToken =
-      await registerConfirmAndLogin('intruder@example.com');
+    const intruderToken = await registerConfirmAndLogin('intruder@example.com');
     const video = await prepareVideo('owner@example.com', VideoStatus.Ready);
     await uploadOriginal(video, Buffer.from('owned-content'));
 
@@ -223,7 +230,7 @@ describe('videos-delivery (e2e)', () => {
       .set('Authorization', `Bearer ${intruderToken}`)
       .expect(403);
 
-    expect(response.body.error).toBe('VIDEO_ACCESS_DENIED');
+    expect(bodyOf<ErrorResponse>(response).error).toBe('VIDEO_ACCESS_DENIED');
   });
 
   it('returns a download URL with attachment disposition and the original filename', async () => {
@@ -241,23 +248,20 @@ describe('videos-delivery (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    const downloadUrl = new URL(response.body.url as string);
+    const download = bodyOf<DeliveryResponse>(response);
+    const downloadUrl = new URL(download.url);
     expect(downloadUrl.origin).toBe(PUBLIC_ENDPOINT);
-    expectFreshExpiresAt(response.body.expiresAt as string);
+    expectFreshExpiresAt(download.expiresAt);
 
-    const downloadResponse = await fetch(response.body.url as string);
+    const downloadResponse = await fetch(download.url);
     expect(downloadResponse.status).toBe(200);
 
     const disposition =
       downloadResponse.headers.get('content-disposition') ?? '';
     expect(disposition).toContain('attachment');
-    const filenameMatch = disposition.match(
-      /filename\*=UTF-8''([^;]+)/i,
-    );
+    const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
     expect(filenameMatch).not.toBeNull();
-    expect(decodeURIComponent(filenameMatch![1])).toBe(
-      'Meu Vídeo Ação.mp4',
-    );
+    expect(decodeURIComponent(filenameMatch![1])).toBe('Meu Vídeo Ação.mp4');
 
     const body = Buffer.from(await downloadResponse.arrayBuffer());
     expect(body.equals(content)).toBe(true);

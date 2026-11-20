@@ -24,11 +24,7 @@ describe('MediaToolsService (unit)', () => {
 
   function mockSuccess(stdout = ''): void {
     execFileMock.mockImplementation(
-      (
-        _file: string,
-        _args: string[],
-        callback: ExecFileCallback,
-      ) => {
+      (_file: string, _args: string[], callback: ExecFileCallback) => {
         callback(null, stdout, '');
       },
     );
@@ -111,11 +107,7 @@ describe('MediaToolsService (unit)', () => {
 
   it('should reject when the underlying command fails', async () => {
     execFileMock.mockImplementation(
-      (
-        _file: string,
-        _args: string[],
-        callback: ExecFileCallback,
-      ) => {
+      (_file: string, _args: string[], callback: ExecFileCallback) => {
         callback(new Error('ffprobe failed'), '', 'boom');
       },
     );

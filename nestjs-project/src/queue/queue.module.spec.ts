@@ -19,9 +19,7 @@ describe('QueueModule', () => {
     }).compile();
 
     try {
-      const queue = module.get<Queue>(
-        getQueueToken(VIDEO_PROCESSING_QUEUE),
-      );
+      const queue = module.get<Queue>(getQueueToken(VIDEO_PROCESSING_QUEUE));
       const counts = await queue.getJobCounts();
 
       expect(module.get(VideoQueueService)).toBeInstanceOf(VideoQueueService);
@@ -44,6 +42,7 @@ describe('QueueModule', () => {
     const queue = module.get<Queue>(getQueueToken(VIDEO_PROCESSING_QUEUE));
 
     try {
+      await queue.pause();
       await service.enqueueProcessing(videoId);
       await service.enqueueProcessing(videoId);
 
@@ -51,7 +50,8 @@ describe('QueueModule', () => {
       expect(jobs.filter((job) => job.id === videoId)).toHaveLength(1);
     } finally {
       const job = await queue.getJob(videoId);
-      await job?.remove();
+      await job?.remove().catch(() => undefined);
+      await queue.resume();
       await module.close();
     }
   }, 30000);

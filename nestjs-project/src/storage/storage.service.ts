@@ -173,8 +173,7 @@ export class StorageService {
           : {}),
       }),
       {
-        expiresIn:
-          expiresInSeconds ?? DEFAULT_PRESIGNED_URL_TTL_SECONDS,
+        expiresIn: expiresInSeconds ?? DEFAULT_PRESIGNED_URL_TTL_SECONDS,
       },
     );
   }

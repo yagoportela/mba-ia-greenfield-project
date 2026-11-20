@@ -46,22 +46,16 @@ export class VideoProcessingProcessor extends WorkerHost {
     const thumbnailPath = join(workDir, 'thumbnail.jpg');
 
     try {
-      await this.storageService.downloadToFile(
-        video.storage_key,
-        originalPath,
-      );
+      await this.storageService.downloadToFile(video.storage_key, originalPath);
 
       const metadata = await this.mediaToolsService.probe(originalPath);
 
       if (!metadata.hasVideoStream || metadata.durationSeconds <= 0) {
-        throw new Error(
-          'Uploaded file does not contain a valid video stream',
-        );
+        throw new Error('Uploaded file does not contain a valid video stream');
       }
 
       const thumbnailKey =
-        video.thumbnail_key ??
-        this.storageService.buildThumbnailKey(video.id);
+        video.thumbnail_key ?? this.storageService.buildThumbnailKey(video.id);
 
       await this.mediaToolsService.generateThumbnail(
         originalPath,
@@ -104,12 +98,8 @@ export class VideoProcessingProcessor extends WorkerHost {
     return job.attemptsMade + 1 >= attempts;
   }
 
-  private async markAsFailed(
-    video: Video,
-    error: unknown,
-  ): Promise<void> {
-    const message =
-      error instanceof Error ? error.message : String(error);
+  private async markAsFailed(video: Video, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
 
     video.status = VideoStatus.Failed;
     video.failure_reason = message.slice(0, FAILURE_REASON_MAX_LENGTH);
