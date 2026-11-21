@@ -19,8 +19,10 @@ describe('ValidationExceptionFilter', () => {
       }),
       getArgs: () => [],
       getArgByIndex: () => null,
-      switchToRpc: () => ({}) as any,
-      switchToWs: () => ({}) as any,
+      switchToRpc: () =>
+        null as unknown as ReturnType<ArgumentsHost['switchToRpc']>,
+      switchToWs: () =>
+        null as unknown as ReturnType<ArgumentsHost['switchToWs']>,
       getType: () => 'http',
     } as unknown as ArgumentsHost;
   });

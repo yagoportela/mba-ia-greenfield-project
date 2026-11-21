@@ -1,0 +1,2 @@
+Leia `.claude/skills/plan-validate/SKILL.md`, `docs/decisions/technical-decisions-phase-03-videos.md` e `docs/phases/phase-03-videos/context.md`.
+Valide consistência, lacunas e dependências, gerando/atualizando `docs/phases/phase-03-videos/validation.md` com o veredito (`clean` ou `dirty`).

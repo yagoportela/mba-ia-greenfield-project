@@ -1,0 +1,2 @@
+Leia `.claude/skills/plan-context/SKILL.md`, `docs/decisions/technical-decisions-phase-03-videos.md` e use `docs/phases/phase-02-auth/context.md` como referência de formato.
+Gere `docs/phases/phase-03-videos/context.md`.

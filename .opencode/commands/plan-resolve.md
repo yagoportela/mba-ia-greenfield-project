@@ -1,0 +1,2 @@
+Leia `.claude/skills/plan-resolve/SKILL.md` e `docs/phases/phase-03-videos/validation.md`.
+Use obrigatoriamente o MCP `context7` para consultar as versões e APIs oficiais das bibliotecas novas da Fase 03. Resolva todas as pendências apontadas, atualize `context.md` e gere `docs/phases/phase-03-videos/library-refs.md`.

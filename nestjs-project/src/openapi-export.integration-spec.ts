@@ -128,4 +128,115 @@ describe('exportSpec (integration)', () => {
       }
     }
   });
+
+  describe('phase 03 video endpoints', () => {
+    const VIDEO_ENDPOINTS = [
+      { path: '/videos', method: 'post' },
+      { path: '/videos/{id}', method: 'get' },
+      { path: '/videos/{id}/upload-parts', method: 'post' },
+      { path: '/videos/{id}/upload-complete', method: 'post' },
+      { path: '/videos/{publicId}/playback', method: 'get' },
+      { path: '/videos/{publicId}/download', method: 'get' },
+    ];
+
+    interface OpenApiOperation {
+      summary?: string;
+      security?: Array<Record<string, unknown>>;
+      responses?: Record<
+        string,
+        {
+          content?: {
+            'application/json'?: {
+              schema?: { $ref?: string };
+            };
+          };
+        }
+      >;
+    }
+
+    type PathsMap = Record<string, Record<string, OpenApiOperation>>;
+
+    function getOperation(
+      pathsMap: PathsMap,
+      path: string,
+      method: string,
+    ): OpenApiOperation {
+      const operation = pathsMap[path]?.[method];
+      expect(operation).toBeDefined();
+      return operation;
+    }
+
+    function expectErrorEnvelope(
+      operation: OpenApiOperation,
+      status: string,
+    ): void {
+      const response = operation.responses?.[status];
+      expect(response).toBeDefined();
+      expect(response?.content?.['application/json']?.schema?.$ref).toBe(
+        '#/components/schemas/ApiErrorEnvelope',
+      );
+    }
+
+    it('exports all six phase 03 paths with a non-empty summary', () => {
+      const pathsMap = document.paths as PathsMap;
+
+      for (const { path, method } of VIDEO_ENDPOINTS) {
+        const operation = getOperation(pathsMap, path, method);
+        expect(typeof operation.summary).toBe('string');
+        expect((operation.summary as string).length).toBeGreaterThan(0);
+      }
+    });
+
+    it('documents the video endpoints as protected with access-token', () => {
+      const pathsMap = document.paths as PathsMap;
+
+      for (const { path, method } of VIDEO_ENDPOINTS) {
+        const operation = getOperation(pathsMap, path, method);
+        const security = operation.security as Array<Record<string, unknown>>;
+        expect(security).toBeDefined();
+        expect(security.some((req) => 'access-token' in req)).toBe(true);
+      }
+    });
+
+    it('references ApiErrorEnvelope on the documented error statuses', () => {
+      const pathsMap = document.paths as PathsMap;
+
+      const expectedErrors: Record<string, string[]> = {
+        '/videos': ['400', '401', '413', '415', '502'],
+        '/videos/{id}': ['401', '403', '404', '502'],
+        '/videos/{id}/upload-parts': ['400', '401', '403', '404', '409', '502'],
+        '/videos/{id}/upload-complete': [
+          '400',
+          '401',
+          '403',
+          '404',
+          '409',
+          '413',
+          '415',
+          '502',
+        ],
+        '/videos/{publicId}/playback': ['401', '403', '404', '409', '502'],
+        '/videos/{publicId}/download': ['401', '403', '404', '409', '502'],
+      };
+
+      for (const { path, method } of VIDEO_ENDPOINTS) {
+        const operation = getOperation(pathsMap, path, method);
+        for (const status of expectedErrors[path]) {
+          expectErrorEnvelope(operation, status);
+        }
+      }
+    });
+
+    it('documents the upload-complete success status as 202', () => {
+      const pathsMap = document.paths as PathsMap;
+      const operation = getOperation(
+        pathsMap,
+        '/videos/{id}/upload-complete',
+        'post',
+      );
+
+      expect(operation.responses?.['202']).toBeDefined();
+      expect(operation.responses?.['201']).toBeUndefined();
+    });
+  });
 });
