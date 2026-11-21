@@ -1,4 +1,4 @@
-import { DataSource, EntitySchema, MigrationInterface } from 'typeorm';
+import { DataSource, DataSourceOptions, MigrationInterface } from 'typeorm';
 
 interface TestDataSourceOptions {
   synchronize?: boolean;
@@ -6,7 +6,7 @@ interface TestDataSourceOptions {
 }
 
 export function createTestDataSource(
-  entities: (Function | string | EntitySchema<any>)[],
+  entities: unknown[],
   options: TestDataSourceOptions = {},
 ): DataSource {
   const { synchronize = true, migrations } = options;
@@ -17,16 +17,14 @@ export function createTestDataSource(
     username: process.env.DB_USERNAME ?? 'streamtube',
     password: process.env.DB_PASSWORD ?? 'streamtube',
     database: process.env.DB_DATABASE ?? 'streamtube',
-    entities,
+    entities: entities as DataSourceOptions['entities'],
     synchronize,
     ...(migrations !== undefined && { migrations, migrationsRun: false }),
   });
 }
 
 export async function cleanAllTables(dataSource: DataSource): Promise<void> {
-  await dataSource.query('DELETE FROM "videos"');
-  await dataSource.query('DELETE FROM "refresh_tokens"');
-  await dataSource.query('DELETE FROM "verification_tokens"');
-  await dataSource.query('DELETE FROM "channels"');
-  await dataSource.query('DELETE FROM "users"');
+  await dataSource.query(
+    'TRUNCATE TABLE "videos", "refresh_tokens", "verification_tokens", "channels", "users" RESTART IDENTITY CASCADE',
+  );
 }

@@ -99,5 +99,7 @@
 - **Observations:**
   - `openapi.json` regenerado via `npm run openapi:export` com os seis endpoints da fase; cada um referencia `#/components/schemas/ApiErrorEnvelope` nos status de erro e expõe `security: access-token`.
   - `src/openapi-export.integration-spec.ts` estendido com checagens de paths, summaries, security e refs de erro (13 testes passando).
-  - `npm run lint` continua vermelho apenas por 150 erros/40 warnings pré-existentes em 11 arquivos da fase 01/02 (auth.e2e-spec 48, auth.service.spec 45, etc.); por decisão do usuário, só os arquivos da fase 03 foram corrigidos — esses agora estão com 0 erros.
+  - Cleanup final de lint: `npm run lint` passa com **0 erros e 0 warnings** em todo o repo. Os 150 erros/40 warnings pré-existentes (fase 01/02) foram corrigidos tipando mocks (`jest.Mock` props), bodies de supertest (`bodyOf<T>`), respostas do Mailpit e casts de entidades; `IsNull()` substituiu `revoked_at: null` (que o TypeORM descartaria silenciosamente).
+  - Verificação pós-cleanup: 221 testes unit/integration + 70 e2e passando, `tsc` exit 0, build exit 0 e `test:e2e` encerra sem `--forceExit` (open handles não se reproduziram após o restart do ambiente).
+  - `test:e2e` passou a fixar `--runInBand` no próprio script (as suítes compartilham o mesmo DB; execução paralela causava FK violations no `cleanAllTables`), e `cleanAllTables` virou um único `TRUNCATE ... RESTART IDENTITY CASCADE`.
   - O cleanup de lint tipou os bodies de supertest (`bodyOf<T>`) e os acessos a `mock.calls`; o e2e de upload agora pausa a fila `video-processing` durante a suíte para o `media-worker` (rodando em dev) não travar jobs antes do cleanup.
