@@ -8,29 +8,31 @@ More info in the project overview: [docs/project-plan.md](docs/project-plan.md)
 
 ## Repository Structure
 
-This is a monorepo with two main areas:
+This is a monorepo with three main areas:
 
-- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for users, channels, videos, comments, etc.
+- `nestjs-project/` — Backend: the NestJS 11 API plus the media worker process. Domain modules: auth, users, channels, videos. Infrastructure modules: storage (S3/MinIO) and queue (BullMQ/Redis).
+- `next-frontend/` — Next.js frontend (App Router, BFF Route Handlers under `app/api`).
 - `docs/` — Project documentation, architecture diagrams, and planning.
-- `next-frontend/` (Next.js) — not yet initialized
 
 ## Architecture (C4 Container Diagram)
 
 See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 
-- **Frontend** (Next.js) → calls API via REST, streams from Object Storage
-- **API** (Nest.js) → business rules, auth, reads/writes DB, uploads to storage, publishes jobs to queue, sends emails
-- **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
-- **Database** (PostgreSQL) → users, channels, videos, comments, likes
+- **Frontend** (Next.js) → calls API via REST; uploads to and streams from Object Storage through presigned URLs
+- **API** (Nest.js) → business rules, auth, reads/writes DB, presigns multipart uploads and delivery URLs, publishes jobs to the queue, sends emails
+- **Video Worker** (FFmpeg) → separate process (`WorkerModule` in `src/worker/`) that consumes jobs from the queue, processes videos, updates DB and storage
+- **Database** (PostgreSQL) → users, channels, videos, refresh and verification tokens
 - **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
+- **Message Queue** (BullMQ + Redis) → `video-processing` jobs and the periodic `video-processing-sweep` reconciliation job
 - **Email Service** (SMTP) → account confirmation and password recovery
+
+The API and the worker are two entry points over the same codebase: `AppModule` (HTTP) and `WorkerModule` (Nest application context, no HTTP server).
 
 ## Docker Networking
 
 This project runs entirely in Docker containers. When configuring connections between services (database, cache, queue, etc.), **always use the Docker Compose service name** as the host — never `localhost` or `127.0.0.1`.
 
-Inside a container, `localhost` refers to the container itself, not the host machine or other containers. Services communicate through the Docker Compose network using their service names (e.g., `db`, `nestjs-api`).
+Inside a container, `localhost` refers to the container itself, not the host machine or other containers. Services communicate through the Docker Compose network using their service names (e.g., `db`, `redis`, `minio`, `nestjs-api`, `media-worker`).
 
 - **Correct:** `DB_HOST=db` (the Compose service name)
 - **Wrong:** `DB_HOST=localhost`
