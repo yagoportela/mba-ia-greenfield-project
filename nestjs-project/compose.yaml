@@ -3,10 +3,18 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile.dev
+    env_file: .env
+    environment:
+      DB_HOST: db
+      MAIL_HOST: mailpit
+      S3_ENDPOINT: http://minio:9000
+      REDIS_HOST: redis
     ports:
       - 3000:3000
     volumes:
       - .:/home/node/app
+      - nestjs-api-dist:/home/node/app/dist
+      - nestjs-api-node-modules:/home/node/app/node_modules
     depends_on:
       db:
         condition: service_healthy
@@ -20,6 +28,10 @@ services:
     volumes:
       - .:/home/node/app
     env_file: .env
+    environment:
+      DB_HOST: db
+      S3_ENDPOINT: http://minio:9000
+      REDIS_HOST: redis
     depends_on:
       db:
         condition: service_healthy
@@ -88,3 +100,5 @@ services:
 
 volumes:
   minio-data:
+  nestjs-api-dist:
+  nestjs-api-node-modules:
